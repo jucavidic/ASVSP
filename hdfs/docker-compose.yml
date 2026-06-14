@@ -1,0 +1,57 @@
+x-hdfs-common: &hdfs-common
+  image: apache/hadoop:3.4.2
+  env_file:
+    - .env
+  networks:
+    - f1-analysis
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
+
+x-datanode-common: &datanode-common
+  <<: *hdfs-common
+  command: hdfs datanode
+  environment:
+    - WAITFOR=namenode:9870
+
+services:
+  
+  namenode:
+    <<: *hdfs-common
+    command: hdfs namenode
+    container_name: namenode
+    environment:
+      - ENSURE_NAMENODE_DIR=/data/name
+    ports: [ 9870:9870 ]
+    volumes:
+      - name-dir:/data
+
+  datanode-1:
+    <<: *datanode-common
+    container_name: datanode-1
+    volumes:
+      - data-dir-1:/data
+
+  datanode-2:
+    <<: *datanode-common
+    container_name: datanode-2
+    volumes:
+      - data-dir-2:/data
+
+  datanode-3:
+    <<: *datanode-common
+    container_name: datanode-3
+    volumes:
+      - data-dir-3:/data    
+
+volumes:
+  name-dir:
+  data-dir-1:
+  data-dir-2:
+  data-dir-3:
+
+networks:
+  f1-analysis:
+    name: f1-analysis
+    external: true

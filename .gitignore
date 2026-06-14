@@ -1,0 +1,9 @@
+# Python
+.venv/
+__pycache__/
+
+# Airflow
+config/
+logs/
+data/
+plugins/

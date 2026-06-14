@@ -1,0 +1,92 @@
+services:
+
+  broker-1:
+    image: apache/kafka:4.1.1
+    container_name: broker-1
+    ports: [ 29092:29092 ]
+    networks:
+      - f1-analysis
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker-1:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker-1:9093,2@broker-2:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  broker-2:
+    image: apache/kafka:4.1.1
+    container_name: broker-2
+    ports: [ 29093:29093 ]
+    networks:
+      - f1-analysis
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker-2:9092,PLAINTEXT_HOST://localhost:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker-1:9093,2@broker-2:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  kafka-ui:
+    image: 'provectuslabs/kafka-ui:v0.7.2'
+    container_name: kafka-ui
+    depends_on:
+      - broker-1
+      - broker-2
+    ports: [ 8092:8080 ]
+    networks:
+      - f1-analysis
+    environment:
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: 'broker-1:9092,broker-2:9092'
+      KAFKA_CLUSTERS_0_NAME: local-kafka-cluster
+
+  kafka-init:
+    image: apache/kafka:4.1.1
+    container_name: kafka-init
+    depends_on: [ broker-1, broker-2 ]
+    networks:
+      - f1-analysis
+    entrypoint: ['/bin/sh', '-c']
+    command: |
+      "
+      echo 'Waiting for Kafka to be ready...'
+      
+      # Wait for Kafka to be fully ready
+      until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server broker-1:9092 > /dev/null 2>&1; do
+        echo 'Kafka not ready yet, waiting...'
+        sleep 1
+      done
+      
+      echo 'Kafka is ready, creating topics...'
+      
+      # Create topics
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --create --if-not-exists --topic network_data --replication-factor 2 --partitions 2
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --create --if-not-exists --topic example_kafka_consumer.raw --replication-factor 1 --partitions 4
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --create --if-not-exists --topic example_kafka_consumer.enriched --replication-factor 1 --partitions 4
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --create --if-not-exists --topic example_kafka_consumer.enriched.failed --replication-factor 1 --partitions 4
+      
+      echo 'Topics created successfully!'
+      /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server broker-1:9092
+      "
+
+networks:
+  f1-analysis:
+    name: f1-analysis
+    external: true

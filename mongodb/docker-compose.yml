@@ -1,0 +1,21 @@
+services:
+
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    ports: [ 27017:27017 ]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - f1-analysis
+
+networks:
+  f1-analysis:
+    name: f1-analysis
+    external: true
+
+volumes:
+  mongodb-data:
